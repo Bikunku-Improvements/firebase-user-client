@@ -63,11 +63,21 @@ import halteNotFound from "../public/assets/image/halteNotFoundBG.svg";
 import Link from "next/link";
 import "leaflet-routing-machine";
 import { BASE_URL } from "../components/constant/urls"
+import { firebaseConfig } from "../components/constant/config"
+import { initializeApp } from "firebase/app";
+import { collection, doc, getDoc, getFirestore, onSnapshot } from "firebase/firestore"; 
 
 interface MapProps {
   children: ReactNode;
 }
 // const ws = new WebSocket("wss://api.bikunku.com/bus/stream?type=client");
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+// const analytics = getAnalytics(app);
+
+// Initialize Cloud Firestore and get a reference to the service
+const db = getFirestore(app);
 
 export default function Map(props: MapProps) {
   // Variabel helper
@@ -97,6 +107,11 @@ export default function Map(props: MapProps) {
   };
   const array = ["Info Bikun", "Info Halte"];
   const arrayRute = ["Semua", "Rute Lurus", "Rute Kanan"];
+
+  // Real-time update firebase
+  const unsub = onSnapshot(doc(db, "bus_locations", "3"), (doc) => {
+    console.log("Current data: ", doc.data());
+  });
 
   // // Messaing Websocket
   // ws.onopen = () => {
