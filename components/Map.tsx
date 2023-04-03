@@ -62,11 +62,12 @@ import gambar6 from "../public/assets/image/donts/6.svg";
 import halteNotFound from "../public/assets/image/halteNotFoundBG.svg";
 import Link from "next/link";
 import "leaflet-routing-machine";
+import { BASE_URL } from "../components/constant/urls"
 
 interface MapProps {
   children: ReactNode;
 }
-const ws = new WebSocket("wss://api.bikunku.com/bus/stream?type=client");
+// const ws = new WebSocket("wss://api.bikunku.com/bus/stream?type=client");
 
 export default function Map(props: MapProps) {
   // Variabel helper
@@ -97,15 +98,15 @@ export default function Map(props: MapProps) {
   const array = ["Info Bikun", "Info Halte"];
   const arrayRute = ["Semua", "Rute Lurus", "Rute Kanan"];
 
-  // Messaing Websocket
-  ws.onopen = () => {
-  };
-  ws.onmessage = (evt) => {
-    setIscenterd(false);
-    setIsHalteClicked(false);
-    const message = JSON.parse(evt.data);
-    setBus(message);
-  };
+  // // Messaing Websocket
+  // ws.onopen = () => {
+  // };
+  // ws.onmessage = (evt) => {
+  //   setIscenterd(false);
+  //   setIsHalteClicked(false);
+  //   const message = JSON.parse(evt.data);
+  //   setBus(message);
+  // };
 
   const setActiveParkById = (id: any) => {
     const HalteClickedById = halteAll.features.filter(
@@ -169,20 +170,20 @@ export default function Map(props: MapProps) {
   // fetch data one halte
   const fetchData = async (park: any) => {
     const req = await fetch(
-      "https://api.bikunku.com/terminal/" + park.properties.PARK_ID
+      BASE_URL + "/terminal/" + park.properties.PARK_ID
     );
     const newData = await req.json();
     return setDetailHalte(newData.data);
   };
 
   const fetchDataByID = async (park: number) => {
-    const req = await fetch("https://api.bikunku.com/terminal/" + park);
+    const req = await fetch(BASE_URL + "/terminal/" + park);
     const newData = await req.json();
     return setDetailHalte(newData.data);
   };
 
   const getBusEstimation = async (park: number) => {
-    const req = fetch("https://api.bikunku.com/bus/info/" + park, {
+    const req = fetch(BASE_URL + "/bus/info/" + park, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -198,7 +199,7 @@ export default function Map(props: MapProps) {
 
         setBusEstimation(data.data.bus);
         const interval = setInterval(() => {
-          const req = fetch("https://api.bikunku.com/bus/info/" + park, {
+          const req = fetch(BASE_URL + "/bus/info/" + park, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -225,7 +226,7 @@ export default function Map(props: MapProps) {
         lat: lat,
         long: lng,
       };
-      const req = fetch("https://api.bikunku.com/terminal/allTerminal", {
+      const req = fetch(BASE_URL + "/terminal/allTerminal", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -241,7 +242,7 @@ export default function Map(props: MapProps) {
         lat: -6.361046716889507,
         long: 106.8317240044786,
       };
-      const req = fetch("https://api.bikunku.com/terminal/allTerminal", {
+      const req = fetch(BASE_URL + "/terminal/allTerminal", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -4,6 +4,7 @@ import fixJadwal from "../data/fixJadwal.json";
 import { useState, useEffect } from "react";
 import Draggable from "react-draggable";
 import { days } from "../components/constant/days";
+import { BASE_URL } from "../components/constant/urls"
 
 // import assets
 import bus from "../public/assets/icon/bus/busJadwal.svg";
@@ -101,7 +102,7 @@ export default function jadwalbikun() {
       lat: -6.361046716889507,
       long: 106.8317240044786,
     };
-    const req = fetch("https://api.bikunku.com/terminal/allTerminal", {
+    const req = fetch(`${BASE_URL}/terminal/allTerminal`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
