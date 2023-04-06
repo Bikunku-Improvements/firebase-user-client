@@ -65,7 +65,7 @@ import "leaflet-routing-machine";
 import { BASE_URL } from "../components/constant/urls"
 import { firebaseConfig } from "../components/constant/config"
 import { initializeApp } from "firebase/app";
-import { collection, query, where, doc, getDoc, getFirestore, onSnapshot, getDocs } from "firebase/firestore"; 
+import { collection, query, where, doc, getDoc, getFirestore, onSnapshot, getDocs, orderBy, limit } from "firebase/firestore"; 
 
 interface MapProps {
   children: ReactNode;
@@ -122,7 +122,11 @@ export default function Map(props: MapProps) {
     const buses: any[] = [];
     
     querySnapshot.forEach((doc) => {
-      getDocs(query(collection(db, "buses", doc.id, "locations")))
+      // For updated 1 doc
+      const q1 = query(collection(db, "buses", doc.id, "locations"))
+      // For multiple docs
+      const q2 = query(collection(db, "buses", doc.id, "locations"), orderBy("timestamp", "desc"), limit(1))
+      getDocs(q2)
         .then((subquerySnapshot) => {
           subquerySnapshot.docs.forEach((subdoc) => {
             buses.push({
