@@ -65,12 +65,12 @@ import "leaflet-routing-machine";
 import { BASE_URL } from "../components/constant/urls"
 import { firebaseConfig } from "../components/constant/config"
 import { initializeApp } from "firebase/app";
-import { collection, doc, getDoc, getFirestore, onSnapshot } from "firebase/firestore"; 
+import { collection, query, where, doc, getDoc, getFirestore, onSnapshot, getDocs } from "firebase/firestore"; 
 
 interface MapProps {
   children: ReactNode;
 }
-// const ws = new WebSocket("wss://api.bikunku.com/bus/stream?type=client");
+const ws = new WebSocket("ws://localhost:8000/bus/stream?type=client");
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -78,6 +78,15 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Cloud Firestore and get a reference to the service
 const db = getFirestore(app);
+
+interface IBus {
+  bus_id: string;
+  heading: string;
+  latitude: string;
+  longitude: string;
+  speed: string;
+  timestamp: any;
+}
 
 export default function Map(props: MapProps) {
   // Variabel helper
@@ -87,7 +96,7 @@ export default function Map(props: MapProps) {
   const router = useRouter();
   const [lat, setLat] = useState(-6.361046716889507);
   const [lng, setLng] = useState(106.8317240044786);
-  const [bus, setBus] = useState([]);
+  const [bus, setBus] = useState<IBus[]>([]);
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [isCentered, setIscenterd] = useState(false);
   const [isUserPosition,setIsUserPosition] = useState(false);
@@ -109,9 +118,33 @@ export default function Map(props: MapProps) {
   const arrayRute = ["Semua", "Rute Lurus", "Rute Kanan"];
 
   // Real-time update firebase
-  const unsub = onSnapshot(doc(db, "bus_locations", "3"), (doc) => {
-    console.log("Current data: ", doc.data());
+  const unsubscribe = onSnapshot(query(collection(db, "buses")), (querySnapshot) => {
+    const buses: any[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      getDocs(query(collection(db, "buses", doc.id, "locations")))
+        .then((subquerySnapshot) => {
+          subquerySnapshot.docs.forEach((subdoc) => {
+            buses.push({
+              id: doc.id,
+              number: doc.data().number,
+              plate: doc.data().plate,
+              route: doc.data().route,
+              status: doc.data().status,
+              is_active: doc.data().is_active,
+              lat: subdoc.data().latitude,
+              long: subdoc.data().longitude,
+              heading: subdoc.data().heading,
+              speed: subdoc.data().speed
+            });
+          })
+        })
+      // buses.push({...doc.data(), id: doc.id})
+    });
+    console.log("Current data: ", buses);
+    setBus(buses);
   });
+
 
   // // Messaing Websocket
   // ws.onopen = () => {
@@ -120,6 +153,7 @@ export default function Map(props: MapProps) {
   //   setIscenterd(false);
   //   setIsHalteClicked(false);
   //   const message = JSON.parse(evt.data);
+  //   console.log(message);
   //   setBus(message);
   // };
 
