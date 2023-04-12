@@ -65,7 +65,7 @@ import "leaflet-routing-machine";
 import { BASE_URL } from "../components/constant/urls"
 import { firebaseConfig } from "../components/constant/config"
 import { initializeApp } from "firebase/app";
-import { collection, query, where, doc, getDoc, getFirestore, onSnapshot, getDocs, orderBy, limit } from "firebase/firestore"; 
+import { collection, query, where, getFirestore, onSnapshot, getDocs, orderBy, limit, getCountFromServer } from "firebase/firestore"; 
 
 interface MapProps {
   children: ReactNode;
@@ -118,35 +118,35 @@ export default function Map(props: MapProps) {
   const arrayRute = ["Semua", "Rute Lurus", "Rute Kanan"];
 
   // Real-time update firebase
-  const unsubscribe = onSnapshot(query(collection(db, "buses")), (querySnapshot) => {
+  const ref = query(collection(db, "bus_locations"))
+
+  const unsubscribe = onSnapshot(ref, (querySnapshot) => {
     const buses: any[] = [];
     
-    querySnapshot.forEach((doc) => {
-      // For updated 1 doc
-      const q1 = query(collection(db, "buses", doc.id, "locations"))
-      // For multiple docs
-      const q2 = query(collection(db, "buses", doc.id, "locations"), orderBy("timestamp", "desc"), limit(1))
-      getDocs(q2)
-        .then((subquerySnapshot) => {
-          subquerySnapshot.docs.forEach((subdoc) => {
+    const q1 = query(collection(db, "buses"))
+    getCountFromServer(q1).then((countSnapshot) => {
+      Array.from(Array(countSnapshot.data().count), (e, i) => {
+        const q2 = query(collection(db, "bus_locations"), where("bus_id", "==", i+1), orderBy("timestamp", "desc"), limit(1))
+        getDocs(q2).then((locSnapshot) => {
+          locSnapshot.forEach((doc) => {
             buses.push({
-              id: doc.id,
+              id: doc.data().bus_id,
               number: doc.data().number,
               plate: doc.data().plate,
               route: doc.data().route,
               status: doc.data().status,
-              is_active: doc.data().is_active,
-              lat: subdoc.data().latitude,
-              long: subdoc.data().longitude,
-              heading: subdoc.data().heading,
-              speed: subdoc.data().speed
+              is_active: doc.data().isActive,
+              lat: doc.data().latitude,
+              long: doc.data().longitude,
+              heading: doc.data().heading,
+              speed: doc.data().speed
             });
           })
         })
-      // buses.push({...doc.data(), id: doc.id})
-    });
-    console.log("Current data: ", buses);
+      })
+    })
     setBus(buses);
+    console.log("Bus: ", buses);
   });
 
 
@@ -157,8 +157,8 @@ export default function Map(props: MapProps) {
   //   setIscenterd(false);
   //   setIsHalteClicked(false);
   //   const message = JSON.parse(evt.data);
-  //   console.log(message);
   //   setBus(message);
+  //   console.log(message);
   // };
 
   const setActiveParkById = (id: any) => {
