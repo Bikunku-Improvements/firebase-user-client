@@ -65,7 +65,8 @@ import "leaflet-routing-machine";
 import { BASE_URL } from "../components/constant/urls"
 import { firebaseConfig } from "../components/constant/config"
 import { initializeApp } from "firebase/app";
-import { collection, query, where, getFirestore, onSnapshot, getDocs, orderBy, limit, getCountFromServer } from "firebase/firestore"; 
+import { collection, query, where, getFirestore, onSnapshot, getDocs, orderBy, limit, getCountFromServer, and } from "firebase/firestore"; 
+import { map } from "leaflet";
 
 interface MapProps {
   children: ReactNode;
@@ -79,13 +80,27 @@ const app = initializeApp(firebaseConfig);
 // Initialize Cloud Firestore and get a reference to the service
 const db = getFirestore(app);
 
-interface IBus {
-  bus_id: string;
-  heading: string;
-  latitude: string;
-  longitude: string;
-  speed: string;
-  timestamp: any;
+type BusMapType = {
+  [id: string]: {
+    number: number;
+    plate: string;
+    status: string;
+    route: string;
+    is_active: boolean;
+  };
+}
+
+type BusData = {
+  id: number;
+  number: number;
+  plate: string;
+  status: string;
+  route: string;
+  is_active: boolean;
+  long: number;
+  lat: number;
+  heading: number;
+  speed: number;
 }
 
 export default function Map(props: MapProps) {
@@ -96,7 +111,7 @@ export default function Map(props: MapProps) {
   const router = useRouter();
   const [lat, setLat] = useState(-6.361046716889507);
   const [lng, setLng] = useState(106.8317240044786);
-  const [bus, setBus] = useState<IBus[]>([]);
+  const [bus, setBus] = useState<BusData[]>([]);
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [isCentered, setIscenterd] = useState(false);
   const [isUserPosition,setIsUserPosition] = useState(false);
@@ -116,39 +131,48 @@ export default function Map(props: MapProps) {
   };
   const array = ["Info Bikun", "Info Halte"];
   const arrayRute = ["Semua", "Rute Lurus", "Rute Kanan"];
+  const busMap: BusMapType = {}
 
-  // Real-time update firebase
-  const ref = query(collection(db, "bus_locations"))
+  // Listener buses firebase
+  // Belom mikirin klo update
+  const busRef = query(collection(db, "buses"), where("is_active", "==", true))
+  const unsubscribeBus = onSnapshot(busRef, (querySnapshot) => {
+    querySnapshot.forEach((doc) => {
+      busMap[doc.id] = {
+        number: doc.data().number,
+        plate: doc.data().plate,
+        status: doc.data().status,
+        route: doc.data().route,
+        is_active: doc.data().is_active,
+      }
+    })
+    console.log(busMap)
+  })
 
-  const unsubscribe = onSnapshot(ref, (querySnapshot) => {
-    const buses: any[] = [];
-    
-    const q1 = query(collection(db, "buses"))
-    getCountFromServer(q1).then((countSnapshot) => {
-      Array.from(Array(countSnapshot.data().count), (e, i) => {
-        const q2 = query(collection(db, "bus_locations"), where("bus_id", "==", i+1), orderBy("timestamp", "desc"), limit(1))
-        getDocs(q2).then((locSnapshot) => {
-          locSnapshot.forEach((doc) => {
-            buses.push({
-              id: doc.data().bus_id,
-              number: doc.data().number,
-              plate: doc.data().plate,
-              route: doc.data().route,
-              status: doc.data().status,
-              is_active: doc.data().isActive,
-              lat: doc.data().latitude,
-              long: doc.data().longitude,
-              heading: doc.data().heading,
-              speed: doc.data().speed
-            });
-          })
-        })
+  // Listener new bus_locations
+  const ref = query(collection(db, "bus_locations"), orderBy("timestamp", "desc"), limit(1))
+  const unsubscribeLocation = onSnapshot(ref, (querySnapshot) => {
+    const busData: BusData[] = [];
+    // Belom bener updating state bus nya
+    querySnapshot.forEach((doc) => {
+      const busId = doc.data().bus_id
+      if (busMap[busId]) busData.push({
+        id: busId,
+        number: busMap[busId].number,
+        plate: busMap[busId].plate,
+        route: busMap[busId].route,
+        status: busMap[busId].status,
+        is_active: busMap[busId].is_active,
+        long: doc.data().longitude,
+        lat: doc.data().latitude,
+        heading: doc.data().heading,
+        speed: doc.data().speed
       })
     })
-    setBus(buses);
-    console.log("Bus: ", buses);
+    console.log(busData)
+    setBus(busData);
+    console.log(bus);
   });
-
 
   // // Messaing Websocket
   // ws.onopen = () => {
