@@ -63,21 +63,12 @@ import halteNotFound from "../public/assets/image/halteNotFoundBG.svg";
 import Link from "next/link";
 import "leaflet-routing-machine";
 import { BASE_URL } from "../components/constant/urls"
-import { firebaseConfig } from "../components/constant/config"
-import { initializeApp } from "firebase/app";
-import { collection, query, getFirestore, onSnapshot, orderBy, limit } from "firebase/firestore"; 
+import db from "../firebase"
+import { collection, query, onSnapshot, orderBy, limit } from "firebase/firestore"; 
 
 interface MapProps {
   children: ReactNode;
 }
-// const ws = new WebSocket("ws://localhost:8000/bus/stream?type=client");
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-// const analytics = getAnalytics(app);
-
-// Initialize Cloud Firestore and get a reference to the service
-const db = getFirestore(app);
 
 type BusMapType = {
   [id: string]: {
@@ -89,7 +80,7 @@ type BusMapType = {
   };
 }
 
-type BusData = {
+type BusLocationData = {
   number: number;
   plate: string;
   status: string;
@@ -101,10 +92,6 @@ type BusData = {
   speed: number;
 }
 
-interface BusLocationMapType {
-  [id: string]: BusData;
-}
-
 export default function Map(props: MapProps) {
   // Variabel helper
   const { children } = props;
@@ -113,7 +100,7 @@ export default function Map(props: MapProps) {
   const router = useRouter();
   const [lat, setLat] = useState(-6.361046716889507);
   const [lng, setLng] = useState(106.8317240044786);
-  const [bus, setBus, busRef] = useStateRef<Record<string, BusData>>({});
+  const [bus, setBus, busRef] = useStateRef<Record<string, BusLocationData>>({});
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [isCentered, setIscenterd] = useState(false);
   const [isUserPosition,setIsUserPosition] = useState(false);
@@ -149,7 +136,7 @@ export default function Map(props: MapProps) {
 
   useEffect(() => {
     // Listener for buses firebase
-    // now querying all buses, check is_active clientside
+    // now querying all buses, check is_active on clientside
     const collectionBusRef = query(collection(db, "buses"))
     const unsubBus = onSnapshot(collectionBusRef, (querySnapshot) => {
       console.log("snapshotBus")
@@ -171,7 +158,7 @@ export default function Map(props: MapProps) {
           }
         }
       })
-      console.log("busMap end:", busMap)
+      console.log("busMap:", busMap)
     })
 
     // Listener for new bus_locations firebase
@@ -181,7 +168,6 @@ export default function Map(props: MapProps) {
       querySnapshot.forEach((doc) => {
         const busId = doc.data().bus_id
         const busData = busMap[busId]
-        console.log("new doc incoming:", doc.data())
         if (busMap[busId]) {
           const updateBus = Object.assign({}, busRef.current);
           updateBus[busId] = {
@@ -195,20 +181,7 @@ export default function Map(props: MapProps) {
             heading: doc.data().heading,
             speed: doc.data().speed
           };
-          console.log("updated bus location end:", updateBus)
-          setBus(updateBus); 
-          // busData.push({
-          //   id: busId,
-          //   number: busMap[busId].number,
-          //   plate: busMap[busId].plate,
-          //   route: busMap[busId].route,
-          //   status: busMap[busId].status,
-          //   is_active: busMap[busId].is_active,
-          //   long: doc.data().longitude,
-          //   lat: doc.data().latitude,
-          //   heading: doc.data().heading,
-          //   speed: doc.data().speed
-          // })
+          setBus(updateBus);
         }
       })
     });
@@ -218,17 +191,6 @@ export default function Map(props: MapProps) {
       unsubLocation
     };
   }, [])
-
-  // // Messaing Websocket
-  // ws.onopen = () => {
-  // };
-  // ws.onmessage = (evt) => {
-  //   setIscenterd(false);
-  //   setIsHalteClicked(false);
-  //   const message = JSON.parse(evt.data);
-  //   setBus(message);
-  //   console.log(message);
-  // };
 
   const setActiveParkById = (id: any) => {
     const HalteClickedById = halteAll.features.filter(
@@ -701,115 +663,6 @@ export default function Map(props: MapProps) {
                 )}
                 </>)}
               )}
-              {/* {bus.map((val: any, index) => (
-                <>
-                  {val?.number === 0 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 1 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus1}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 2 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus2}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 3 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus3}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 4 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus4}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 5 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus5}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 6 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus6}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 7 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus7}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 8 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus8}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 8 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus8}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 9 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus9}
-                      ></Marker>
-                    </>
-                  ) : val?.number === 10 ? (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus10}
-                      ></Marker>
-                    </>
-                  ) : (
-                    <>
-                      {" "}
-                      <Marker
-                        position={[val?.lat, val?.long]}
-                        icon={iconBus}
-                      ></Marker>
-                    </>
-                  )}
-                </>
-              ))} */}
               <Marker position={[lat, lng]}></Marker>
               {isCentered && <RecenterAutomatically lat={lat} lng={lng} />}
               {isHalteClicked && <RecenterAutomatically lat={lat} lng={lng} />}
@@ -1724,12 +1577,6 @@ export default function Map(props: MapProps) {
                   ></Marker>
                 )
               })}
-              {/* {bus.map((val: any, index) => (
-                <Marker
-                  position={[val?.lat, val?.long]}
-                  icon={iconBus}
-                ></Marker>
-              ))} */}
               {isCentered && <RecenterAutomatically lat={lat} lng={lng} />}
             </MapContainer>
           </div>
