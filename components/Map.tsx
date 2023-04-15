@@ -8,7 +8,7 @@ import {
 import "leaflet/dist/leaflet.css";
 import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.css";
 import "leaflet-defaulticon-compatibility";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import halteRed from "../data/halteRed.json";
 import halteBlue from "../data/halteBlue.json";
 import halteMix from "../data/halteMix.json";
@@ -65,13 +65,12 @@ import "leaflet-routing-machine";
 import { BASE_URL } from "../components/constant/urls"
 import { firebaseConfig } from "../components/constant/config"
 import { initializeApp } from "firebase/app";
-import { collection, query, where, getFirestore, onSnapshot, getDocs, orderBy, limit, getCountFromServer, and } from "firebase/firestore"; 
-import { map } from "leaflet";
+import { collection, query, getFirestore, onSnapshot, orderBy, limit } from "firebase/firestore"; 
 
 interface MapProps {
   children: ReactNode;
 }
-const ws = new WebSocket("ws://localhost:8000/bus/stream?type=client");
+// const ws = new WebSocket("ws://localhost:8000/bus/stream?type=client");
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -91,7 +90,6 @@ type BusMapType = {
 }
 
 type BusData = {
-  id: number;
   number: number;
   plate: string;
   status: string;
@@ -103,6 +101,10 @@ type BusData = {
   speed: number;
 }
 
+interface BusLocationMapType {
+  [id: string]: BusData;
+}
+
 export default function Map(props: MapProps) {
   // Variabel helper
   const { children } = props;
@@ -111,7 +113,7 @@ export default function Map(props: MapProps) {
   const router = useRouter();
   const [lat, setLat] = useState(-6.361046716889507);
   const [lng, setLng] = useState(106.8317240044786);
-  const [bus, setBus] = useState<BusData[]>([]);
+  const [bus, setBus, busRef] = useStateRef<Record<string, BusData>>({});
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [isCentered, setIscenterd] = useState(false);
   const [isUserPosition,setIsUserPosition] = useState(false);
@@ -131,48 +133,91 @@ export default function Map(props: MapProps) {
   };
   const array = ["Info Bikun", "Info Halte"];
   const arrayRute = ["Semua", "Rute Lurus", "Rute Kanan"];
-  const busMap: BusMapType = {}
+  const busMap: BusMapType = {} // Client side active bus data, automatically updated
 
-  // Listener buses firebase
-  // Belom mikirin klo update
-  const busRef = query(collection(db, "buses"), where("is_active", "==", true))
-  const unsubscribeBus = onSnapshot(busRef, (querySnapshot) => {
-    querySnapshot.forEach((doc) => {
-      busMap[doc.id] = {
-        number: doc.data().number,
-        plate: doc.data().plate,
-        status: doc.data().status,
-        route: doc.data().route,
-        is_active: doc.data().is_active,
-      }
-    })
-    console.log(busMap)
-  })
+  // Utility state hook with ref
+  function useStateRef<T extends unknown>(initialValue: T) {
+    const [value, setValue] = useState(initialValue);
+    const ref = useRef(value);
+  
+    useEffect(() => {
+      ref.current = value;
+    }, [value]);
+  
+    return [value, setValue, ref] as const;
+  }
 
-  // Listener new bus_locations
-  const ref = query(collection(db, "bus_locations"), orderBy("timestamp", "desc"), limit(1))
-  const unsubscribeLocation = onSnapshot(ref, (querySnapshot) => {
-    const busData: BusData[] = [];
-    // Belom bener updating state bus nya
-    querySnapshot.forEach((doc) => {
-      const busId = doc.data().bus_id
-      if (busMap[busId]) busData.push({
-        id: busId,
-        number: busMap[busId].number,
-        plate: busMap[busId].plate,
-        route: busMap[busId].route,
-        status: busMap[busId].status,
-        is_active: busMap[busId].is_active,
-        long: doc.data().longitude,
-        lat: doc.data().latitude,
-        heading: doc.data().heading,
-        speed: doc.data().speed
+  useEffect(() => {
+    // Listener for buses firebase
+    // now querying all buses, check is_active clientside
+    const collectionBusRef = query(collection(db, "buses"))
+    const unsubBus = onSnapshot(collectionBusRef, (querySnapshot) => {
+      console.log("snapshotBus")
+      querySnapshot.forEach((doc) => {
+        if (doc.data().is_active) {
+          busMap[doc.id] = {
+            number: doc.data().number,
+            plate: doc.data().plate,
+            status: doc.data().status,
+            route: doc.data().route,
+            is_active: doc.data().is_active,
+          }
+        } else {
+          if (busMap[doc.id]) {
+            delete busMap[doc.id]
+            const updateBus = Object.assign({}, busRef.current)
+            delete updateBus[doc.id]
+            setBus(updateBus)
+          }
+        }
       })
+      console.log("busMap end:", busMap)
     })
-    console.log(busData)
-    setBus(busData);
-    console.log(bus);
-  });
+
+    // Listener for new bus_locations firebase
+    const locRef = query(collection(db, "bus_locations"), orderBy("timestamp", "desc"), limit(1))
+    const unsubLocation = onSnapshot(locRef, (querySnapshot) => {
+      console.log("snapshotLocation")
+      querySnapshot.forEach((doc) => {
+        const busId = doc.data().bus_id
+        const busData = busMap[busId]
+        console.log("new doc incoming:", doc.data())
+        if (busMap[busId]) {
+          const updateBus = Object.assign({}, busRef.current);
+          updateBus[busId] = {
+            number: busData.number,
+            plate: busData.plate,
+            status: busData.status,
+            route: busData.route,
+            is_active: busData.is_active,
+            long: doc.data().longitude,
+            lat: doc.data().latitude,
+            heading: doc.data().heading,
+            speed: doc.data().speed
+          };
+          console.log("updated bus location end:", updateBus)
+          setBus(updateBus); 
+          // busData.push({
+          //   id: busId,
+          //   number: busMap[busId].number,
+          //   plate: busMap[busId].plate,
+          //   route: busMap[busId].route,
+          //   status: busMap[busId].status,
+          //   is_active: busMap[busId].is_active,
+          //   long: doc.data().longitude,
+          //   lat: doc.data().latitude,
+          //   heading: doc.data().heading,
+          //   speed: doc.data().speed
+          // })
+        }
+      })
+    });
+
+    return () => {
+      unsubBus
+      unsubLocation
+    };
+  }, [])
 
   // // Messaing Websocket
   // ws.onopen = () => {
@@ -545,7 +590,118 @@ export default function Map(props: MapProps) {
               ) : (
                 <></>
               )}
-              {bus.map((val: any, index) => (
+              {Object.values(bus).map((val) => {
+                console.log("State on render:", bus)
+                return (
+                  <>
+                  {val?.number === 0 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 1 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus1}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 2 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus2}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 3 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus3}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 4 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus4}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 5 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus5}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 6 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus6}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 7 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus7}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 8 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus8}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 8 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus8}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 9 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus9}
+                      ></Marker>
+                    </>
+                  ) : val?.number === 10 ? (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus10}
+                      ></Marker>
+                    </>
+                  ) : (
+                    <>
+                      {" "}
+                      <Marker
+                        position={[val?.lat, val?.long]}
+                        icon={iconBus}
+                      ></Marker>
+                    </>
+                )}
+                </>)}
+              )}
+              {/* {bus.map((val: any, index) => (
                 <>
                   {val?.number === 0 ? (
                     <>
@@ -653,7 +809,7 @@ export default function Map(props: MapProps) {
                     </>
                   )}
                 </>
-              ))}
+              ))} */}
               <Marker position={[lat, lng]}></Marker>
               {isCentered && <RecenterAutomatically lat={lat} lng={lng} />}
               {isHalteClicked && <RecenterAutomatically lat={lat} lng={lng} />}
@@ -1560,12 +1716,20 @@ export default function Map(props: MapProps) {
                 <></>
               )}
 
-              {bus.map((val: any, index) => (
+              {Object.values(bus).map((val) => {
+                return (
+                  <Marker
+                    position={[val?.lat, val?.long]}
+                    icon={iconBus}
+                  ></Marker>
+                )
+              })}
+              {/* {bus.map((val: any, index) => (
                 <Marker
                   position={[val?.lat, val?.long]}
                   icon={iconBus}
                 ></Marker>
-              ))}
+              ))} */}
               {isCentered && <RecenterAutomatically lat={lat} lng={lng} />}
             </MapContainer>
           </div>
