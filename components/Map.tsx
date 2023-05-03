@@ -166,12 +166,12 @@ export default function Map(props: MapProps) {
     const unsubLocation = onSnapshot(locRef, (querySnapshot) => {
       console.log("snapshotLocation")
       querySnapshot.forEach((doc) => {
-        // Calculating latency from timestamp
-        const now = new Date().getTime()
-        const created = doc.data().timestamp.seconds*1000 + doc.data().timestamp.nanoseconds/1000000
-        console.log("Now:", new Date(now).toString(), now)
-        console.log("Created:", new Date(Math.trunc(created)).toString(), created)
-        console.log("Latency:", now - created)
+        // // Calculating latency from timestamp
+        // const now = new Date().getTime()
+        // const created = doc.data().timestamp.seconds*1000 + doc.data().timestamp.nanoseconds/1000000
+        // console.log("Now:", new Date(now).toString(), now)
+        // console.log("Created:", new Date(Math.trunc(created)).toString(), created)
+        // console.log("Latency:", now - created)
 
         const busId = doc.data().bus_id
         const busData = busMap[busId]
@@ -560,7 +560,7 @@ export default function Map(props: MapProps) {
                 <></>
               )}
               {Object.values(bus).map((val) => {
-                console.log("State on render:", bus)
+                console.log("Bus state:", bus)
                 return (
                   <>
                   {val?.number === 0 ? (
