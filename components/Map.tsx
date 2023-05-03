@@ -63,8 +63,12 @@ import halteNotFound from "../public/assets/image/halteNotFoundBG.svg";
 import Link from "next/link";
 import "leaflet-routing-machine";
 import { BASE_URL } from "../components/constant/urls"
-import db from "../firebase"
+import app from "../firebase"
 import { collection, query, onSnapshot, orderBy, limit } from "firebase/firestore"; 
+import { getFirestore } from "firebase/firestore"; 
+
+// Initialize Cloud Firestore and get a reference to the service
+const db = getFirestore(app);
 
 interface MapProps {
   children: ReactNode;
@@ -135,8 +139,8 @@ export default function Map(props: MapProps) {
   }
 
   useEffect(() => {
-    // Listener for buses firebase
-    // now querying all buses, check is_active on clientside
+    // Listener for buses collection firebase
+    // Query all buses, check is_active on clientside, update busMap
     const collectionBusRef = query(collection(db, "buses"))
     const unsubBus = onSnapshot(collectionBusRef, (querySnapshot) => {
       console.log("snapshotBus")
@@ -161,7 +165,8 @@ export default function Map(props: MapProps) {
       console.log("busMap:", busMap)
     })
 
-    // Listener for new bus_locations firebase
+    // Listener for bus_locations collection firebase
+    // Query newest location update, update bus state
     const locRef = query(collection(db, "bus_locations"), orderBy("timestamp", "desc"), limit(1))
     const unsubLocation = onSnapshot(locRef, (querySnapshot) => {
       console.log("snapshotLocation")
